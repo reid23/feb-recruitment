@@ -24,6 +24,9 @@ def smooth_path(pts, rad, dx=1, curve_est_dist = 15, extra_points=10):
         dx (float, optional): interpolation distance. Defaults to 1.
         curve_est_dist (int, optional): how many points to use to fit a circle to estimate radius of curvature. defaults to 15.
         extra_points (int, optional): how many extra points to add on to the sub-path after finding the curvatures. defaults to 10.
+
+    Returns:
+        path (ndarray): an array of the path with the minimum radius enforced. Represented as mesh with spacing dx.
     """
 
     # step 1: interpolate points to regular intervals
@@ -144,6 +147,7 @@ def smooth_path(pts, rad, dx=1, curve_est_dist = 15, extra_points=10):
         t2 = np.linspace(0, 1, int(np.ceil(l2/dx)), endpoint=True) 
         straight1, straight2 = straight1(t1), straight2(t2)
 
+        # now get the arc! again, refer to The Math Paper for details
         vbarhat = (1/2)*(v1hat+v2hat)
         vbarhat = vbarhat/norm(vbarhat)
 
@@ -162,16 +166,9 @@ def smooth_path(pts, rad, dx=1, curve_est_dist = 15, extra_points=10):
             path = np.concatenate((path[cutout_idx+cutout_len-len(path):cutout_idx], snippet.T), axis=0)
         else:
             path = np.concatenate((path[:cutout_idx], snippet.T, path[(cutout_idx+cutout_len):]), axis=0)
-
-    # remove duplicates again, since sometimes the edges of the cut regions overlapped 
-    nasty = np.unique(path, axis=0)
-    
-    newpath = []
-    for point in path:
-        if np.sum(to_delete:=np.nonzero(norm(nasty-point, axis=1)<(dx/5))) > 0:
-            nasty = np.delete(nasty, to_delete, axis=0)
-            newpath.append(point)
-    return np.array(newpath)
+            
+    # and that's it! we've fixed everything. Return!
+    return path
 
 def offset_path(path, offset):
     # use diff to get vectors parallel to the path
@@ -197,7 +194,7 @@ def get_test_track():
     return smooth_path(pts, 10)
 # %%
 if __name__ == '__main__':
-    track = ['test_track', 'curved_track', 'sword_track'][0]
+    track = ['test_track', 'curved_track', 'sword_track'][1]
 
     if track != 'test_track':
         with open(track, "r") as f:

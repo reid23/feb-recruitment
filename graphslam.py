@@ -57,14 +57,28 @@ def solve_graph():
     global lm_guesses, lm, lm_cons
     global x_guesses, x, x_cons
 
+    # construct optimization objective
     cons = vertcat(*x_cons, *lm_cons, x[0]-DM(path[0]))
-    # print(x)
-    # print("lm:")
-    # print(lm)
+    # and formulate our QP problem
     qp = {'x':vertcat(*x, *lm), 'f':cons.T@cons}
-    # solver = qpsol('solver', 'osqp', qp, {'print_time':0, 'print_problem':0})
 
+    # possible solvers
+    # so i tried the quadratic ones because
+    # like obviously this is a quadratic programming probem
+    # but they're slower??
+    # needs more info since my computer's BLAS/LAPACK setup is
+    # entirely fucked
+    # also that's the reason all the HSL solvers are much slower
+    # on my mac for MPC, IPOPT with MA27 was like 10x faster than 
+    # with MUMPS, but here, it's much slower. On WSL it's about equal
+    # so idek anymore
+    # prob best just to leave these here so we can test later
+    
+    # solver = qpsol('solver', 'qpoases', qp, {'printLevel':'none', 'print_time':0, 'print_problem':0})
+    # solver = qpsol('solver', 'osqp', qp, {'print_time':0, 'print_problem':0})
     solver = nlpsol('solver', 'ipopt', qp, solver_opts)
+
+    # actually solve the QP problem
     soln = np.array(solver(x0=vertcat(*x_guesses, *lm_guesses))['x'])
     split = len(x_guesses)*2
 
@@ -95,13 +109,13 @@ for i in range(1, len(path)):
     )-path[i]
     z = z+random(z.shape)
     no_slam_lm.append(z+no_slam_x[-1])
-    # print(z)
 
     # update graph
     t0 = perf_counter()
     update_graph(dx, z)
     t1 = perf_counter()
-    # x_guesses, lm_guesses = solve_graph()
+    #* comment this line out to only solve at the end
+    x_guesses, lm_guesses = solve_graph()
     t2 = perf_counter()
     solve_times.append([t1-t0, t2-t1, len(x_cons)+len(lm_cons)])
     # progress bar
