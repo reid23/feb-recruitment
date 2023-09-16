@@ -3,6 +3,7 @@ import numpy as np
 from numpy.linalg import *
 import matplotlib.pyplot as plt
 import scipy as sp
+import pandas as pd
 
 #%%
 pts = np.array([[0,0],[50,0],[50, 60],[-100, 60],[-100, -50],[-50, -50],[-50,0]])
@@ -106,9 +107,9 @@ def smooth_path(pts, rad, dx=1, curve_est_dist = 15, extra_points=10):
     bad[-1] = np.concatenate((bad[-1], bad[0]), axis=0)
     bad = bad[1:]
 
+    # for this bit see the derivation on the paper
     for area in bad:
-        # plt.scatter(*area.T)
-        # plt.show()
+        # find location of the cutout in the path
         cutout_len = area.shape[0]
         cutout_idx = np.argmin(norm(path-area[0], axis=1)) # where both x and y match
 
@@ -173,39 +174,53 @@ def smooth_path(pts, rad, dx=1, curve_est_dist = 15, extra_points=10):
     return np.array(newpath)
 
 def offset_path(path, offset):
+    # use diff to get vectors parallel to the path
     diffs = np.diff(path, prepend=path[-1:], axis=0).T
+    # rotate all the vecs ccw by 90 degrees to get vecs orth to path
     shifts = rot(np.pi/2)@diffs
+    # scale them properly by `offset`
     shifts = offset*shifts/norm(shifts, axis=0)
+    # shift the actual path by these shifts and return it
     return path+shifts.T # need shifts.T to convert back to row vectors
 
 #util for displaying nicely
 def loopify(path):
     return np.concatenate((path[-1:], path), axis=0).T
 
+def export_path(path, width):
+    df = pd.DataFrame(np.concatenate((path, np.ones(path.shape)*width*0.5), axis=1))
+    df.columns = ['x_m', 'y_m', 'w_left', 'w_right']
+    print(df.head())
+    df.to_csv('path.csv', ',')
+
+def get_test_track():
+    return smooth_path(pts, 10)
 # %%
-track = ['test_track', 'curved_track', 'sword_track'][2]
+if __name__ == '__main__':
+    track = ['test_track', 'curved_track', 'sword_track'][0]
 
-if track != 'test_track':
-    with open(track, "r") as f:
-        pts = np.array(eval(f.read())) # eval() is okay bc I'm the only one writing test_track or whatever
+    if track != 'test_track':
+        with open(track, "r") as f:
+            pts = np.array(eval(f.read())) # eval() is okay bc I'm the only one writing test_track or whatever
 
-if track == 'curved_track':
-    path = smooth_path(pts, 20, dx=1, curve_est_dist = 15, extra_points=20)
-elif track == 'sword_track':
-    path = smooth_path(pts, 15, dx=1, curve_est_dist = 15, extra_points=10)
-elif track == 'test_track':
-    path = smooth_path(pts, 10)
+    if track == 'curved_track':
+        path = smooth_path(pts, 20, dx=1, curve_est_dist = 15, extra_points=20)
+    elif track == 'sword_track':
+        path = smooth_path(pts, 15, dx=1, curve_est_dist = 15, extra_points=15)
+    elif track == 'test_track':
+        path = smooth_path(pts, 10)
 
-left = offset_path(path, 2)
-right = offset_path(path, -2)
-plt.plot(*loopify(left), color='tab:blue', label='boundary')
-plt.plot(*loopify(right), color='tab:blue')
+    left = offset_path(path, 2)
+    right = offset_path(path, -2)
+    plt.plot(*loopify(left), color='tab:blue', label='boundary')
+    plt.plot(*loopify(right), color='tab:blue')
 
-plt.plot(*loopify(pts), color='tab:orange', label='input path')
-plt.plot(*loopify(path), color='tab:blue', linestyle='dashed', label='centerline')
+    plt.plot(*loopify(pts), color='tab:orange', label='input path')
+    plt.plot(*loopify(path), color='tab:blue', linestyle='dashed', label='centerline')
 
-plt.legend()
-# plt.scatter(*path.T, c=np.linspace(0, 1, len(path)), cmap='coolwarm')
-plt.show()
+    plt.legend()
+    # plt.scatter(*path.T, c=np.linspace(0, 1, len(path)), cmap='coolwarm')
+    plt.show()
 
-# %%
+    # %%
+    export_path(path, 4)
