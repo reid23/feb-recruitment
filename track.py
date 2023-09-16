@@ -166,7 +166,17 @@ def smooth_path(pts, rad, dx=1, curve_est_dist = 15, extra_points=10):
             path = np.concatenate((path[cutout_idx+cutout_len-len(path):cutout_idx], snippet.T), axis=0)
         else:
             path = np.concatenate((path[:cutout_idx], snippet.T, path[(cutout_idx+cutout_len):]), axis=0)
-            
+        
+    # remove duplicates again, since sometimes the edges of the cut regions overlapped 
+    nasty = np.unique(path, axis=0)
+
+    newpath = []
+    for point in path:
+        if np.sum(to_delete:=np.nonzero(norm(nasty-point, axis=1)<(dx/5))) > 0:
+            nasty = np.delete(nasty, to_delete, axis=0)
+            newpath.append(point)
+    return np.array(newpath)
+
     # and that's it! we've fixed everything. Return!
     return path
 
@@ -194,16 +204,16 @@ def get_test_track():
     return smooth_path(pts, 10)
 # %%
 if __name__ == '__main__':
-    track = ['test_track', 'curved_track', 'sword_track'][1]
+    track = ['test_track', 'curved_track', 'sword_track'][2]
 
     if track != 'test_track':
         with open(track, "r") as f:
             pts = np.array(eval(f.read())) # eval() is okay bc I'm the only one writing test_track or whatever
 
     if track == 'curved_track':
-        path = smooth_path(pts, 20, dx=1, curve_est_dist = 15, extra_points=20)
+        path = smooth_path(pts, 20, dx=1, curve_est_dist = 5, extra_points=30)
     elif track == 'sword_track':
-        path = smooth_path(pts, 15, dx=1, curve_est_dist = 15, extra_points=15)
+        path = smooth_path(pts, 10, dx=1, curve_est_dist = 10, extra_points=15)
     elif track == 'test_track':
         path = smooth_path(pts, 10)
 
