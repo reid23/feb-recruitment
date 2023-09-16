@@ -104,7 +104,7 @@ no_slam_lm = []
 solve_times = []
 for i in range(1, len(path)):
     # get fake odometry measurement
-    dx = (path[i]-path[i-1]+(random(2)*0.2)) # add noise with stdev 0.01
+    dx = (path[i]-path[i-1]+(random(2)*0.1)) # add noise with stdev 0.01
     no_slam_x.append(no_slam_x[-1]+dx)
     # get fake observations
     z = np.concatenate(
@@ -112,7 +112,7 @@ for i in range(1, len(path)):
         (right[norm(right-path[i], axis=1)<vision_range])),
         axis=0
     )-path[i]
-    z = z+random(z.shape)*2
+    z = z+random(z.shape)*1
     no_slam_lm.append(z+no_slam_x[-1])
 
     # update graph
