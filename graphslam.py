@@ -101,7 +101,7 @@ for i in range(1, len(path)):
     t0 = perf_counter()
     update_graph(dx, z)
     t1 = perf_counter()
-    x_guesses, lm_guesses = solve_graph()
+    # x_guesses, lm_guesses = solve_graph()
     t2 = perf_counter()
     solve_times.append([t1-t0, t2-t1, len(x_cons)+len(lm_cons)])
     # progress bar
@@ -109,10 +109,11 @@ for i in range(1, len(path)):
     print(f'\r|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)}', end='')
 print()
 toc = perf_counter()
-# x_guesses, lm_guesses = solve_graph()
+x_guesses, lm_guesses = solve_graph()
 tic = perf_counter()
 print(f'solve time: {tic-toc}')
 # %%
+plt.style.use('dark_background')
 fig, axs = plt.subplots(2, 2, gridspec_kw=dict(height_ratios=[3,1]))
 
 # plot true track
@@ -141,5 +142,6 @@ axs[1][1].set_ylabel('Time (s)')
 axs[1][1].set_title('Solve Time vs. Number of Edges')
 
 fig.set_tight_layout(True)
-fig.suptitle(f"GraphSLAM: re-optimization at each new pose\nLandmark view distance: {vision_range}m, Solver: IPOPT+MUMPS")
+# fig.suptitle(f"GraphSLAM: re-optimization at each new pose\nLandmark view distance: {vision_range}m, Solver: IPOPT+MUMPS")
+fig.suptitle(f"GraphSLAM: single optimization after completed lap.\nLandmark view distance: {vision_range}m, Solver: IPOPT+MUMPS. Solve time: 0.1223s")
 plt.show()
