@@ -99,12 +99,11 @@ What is "best"?
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
-| criteria                       | constraints                    |
-| ------------------------------ | ------------------------------ |
-| fast during racing             | fast enough to be run online |
-| accurate and precise           | robust to a few outliers       |
-| minimize large discontinuities | can handle 50-100 landmarks    |
-| have high-frequency updates    | converge to *something*          |
+| criteria                                 | constraints                  |
+| ---------------------------------------- | ---------------------------- |
+| have high-frequency updates while racing | fast enough to be run online |
+| accurate and precise                     | robust to a few outliers     |
+| minimize large discontinuities           | can handle 50-100 landmarks  |
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
@@ -117,16 +116,14 @@ What is "best"?
 
 ## EKF-SLAM
 Extended Kalman Filter-SLAM
-<style>
-.reveal table { font-size: 0.7em; }
-</style>
+<style>.reveal table { font-size: 0.7em; }</style>
 
-| pros                                                     | cons                                                                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| fast (entirely recursive)                                | limited robustness, especially with LQR                                                        |
-| optimal for LQG                                          | linearization `$\implies$` bad integration and distribution propagation |
-| can be improved: UKF, MWEKF, SKF, etc. | loop closure is a large issue                                                                       |
-| (for me) feels doable `$\implies$` lower R&D costs                 |                                                                                                            |
+| pros                                             | cons                                                                  |
+| ------------------------------------------------ | --------------------------------------------------------------------- |
+| fast (entirely recursive)                        | limited robustness, especially with LQR                               |
+| can be improved: UKF, MWEKF, SKF, etc                                                 | linearization `$\implies$` bad integration and distribution propagation |
+| (for me) feels doable `$\implies$` lower R&D costs          | loop closure is a large issue                                         |
+| optimal for LQG |                                                                       |
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
@@ -134,44 +131,47 @@ Extended Kalman Filter-SLAM
 replace the EKF with a particle filter!
 <style>.reveal table { font-size: 0.7em; }</style>
 
-| pros                                                                                                                         | cons                                                       |
-| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| pros                                                                                                     | cons                                                       |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | usable integration and PDF propagation, even with nonlinearity                                           | slower because of the need to keep track of many particles |
-| ✨optimizations✨ `$\implies$` don't compute *all* covariances between landmarks, so computation is doable | still doesn't fix loop closure issues                      |
-| more accurate than EKF-SLAM                                                                                                  | (to me) feels harder `$\implies$` more R&D    |
+| ✨optimizations✨ `$\implies$` don't compute *all* covariances between landmarks, so computation is doable | loop closure                                               | 
+|                                                                                                          | (to me) feels harder `$\implies$` more R&D                   |
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
 ## GraphSLAM
 lump info into a big system of equations
 <style>.reveal table { font-size: 0.7em; }</style>
+
 | pros                                                   | cons                                                                             |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | can fix errors over longer periods of time             | solve time is `$O(E)$`, and can get bad                                            |
-| solves loop closure problem well                       | not optimal (in the sense that optimal controls are optimal)                     |
-|  (to me) simpler to implement `$\implies$` lower R&D costs                | doesn't take into account vehicle dynamics except to get initial guess for poses |
+| solves loop closure problem well                       |  doesn't take into account vehicle dynamics except to get initial guess for poses                    |
+|  (to me) simpler to implement `$\implies$` lower R&D costs                |  |
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
 ## My proposal
-- Use GraphSLAM to form an initial map on the first lap (the mapping lap), while we aren't as pressed for time.
-	- maybe use FastSLAM for accuracy here to build graph. We have the time.
+- Use GraphSLAM to form an initial map on mapping lap (we have time)
+	- maybe use FastSLAM for accuracy to build graph
 - While racing, use simple feature matching to give very high frequency position updates for control. 
-	- Perhaps MWEKF-SLAM if delay is a problem or SKF-SLAM if sliding/hybrid dynamics are present.
+	- Perhaps use simple EKF or variants if helpful
+	- Add SLAM only if adjusting map is necessary
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
 ## testing
 The main point of the initial GraphSLAM lap is to solve the loop closing problem. 
-- Does that actually work?
+- Does that actually solve the problem?
+- Is the resulting map good enough?
 - Is GraphSLAM's computation feasible to do online?
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
 ## setup
+- Measurements are calculated from true path (centerline) to true landmark, then noise is added.
 - uniform noise `$v\in[0,1)$` added to landmark measurements
 - uniform noise `$w\in[0,0.1)$` added to `$\Delta x$` measurements
-- Measurements are calculated from true path (centerline) to true landmark, then noise is added.
 - Algorithm only gets noisy `$\Delta x$` and noisy vectors to landmarks within 10m of car.
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
@@ -184,6 +184,11 @@ single-shot GraphSLAM
 <img src="graphslam_just_end.png" alt="" style="object-fit: scale-down">
 
 Very good loop closure despite non-gaussian, non-zero-mean noise!
+</div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
+<div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
+
+conclusions:
+yes, this is feasible!
 </div></script></section><section  data-markdown><script type="text/template"><!-- .slide: class="drop" -->
 <div class="" style="position: absolute; left: 0px; top: 0px; height: 700px; width: 960px; min-height: 700px; display: flex; flex-direction: column; align-items: center; justify-content: center" absolute="true">
 
