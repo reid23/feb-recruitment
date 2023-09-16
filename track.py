@@ -204,7 +204,7 @@ def get_test_track():
     return smooth_path(pts, 10)
 # %%
 if __name__ == '__main__':
-    track = ['test_track', 'curved_track', 'sword_track'][2]
+    track = ['test_track', 'curved_track', 'sword_track'][0]
 
     if track != 'test_track':
         with open(track, "r") as f:
@@ -217,7 +217,7 @@ if __name__ == '__main__':
     elif track == 'test_track':
         path = smooth_path(pts, 10)
 
-    left = offset_path(path, 2)
+    left = offset_path(path, 2) # set offset to like 4 to 6 for sword, since scale is off
     right = offset_path(path, -2)
     plt.plot(*loopify(left), color='tab:blue', label='boundary')
     plt.plot(*loopify(right), color='tab:blue')
