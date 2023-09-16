@@ -73,7 +73,12 @@ def solve_graph():
     # with MUMPS, but here, it's much slower. On WSL it's about equal
     # so idek anymore
     # prob best just to leave these here so we can test later
-    
+
+    # also maybe because this is an unconstrained optimization problem,
+    # whereas these QP and NLP solvers are meant for constrained problems?
+    # ig the whole IP method doesn't make as much sense without the need
+    # for constraints. Since you can just optimize.
+
     # solver = qpsol('solver', 'qpoases', qp, {'printLevel':'none', 'print_time':0, 'print_problem':0})
     # solver = qpsol('solver', 'osqp', qp, {'print_time':0, 'print_problem':0})
     solver = nlpsol('solver', 'ipopt', qp, solver_opts)
