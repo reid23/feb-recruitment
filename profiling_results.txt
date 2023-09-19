@@ -1,0 +1,98 @@
+Timer unit: 1e-06 s
+
+Total time: 0.0460693 s
+File: feb-recruitment/graphslam.py
+Function: solve_graph at line 57
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    57                                           @profile
+    58                                           def solve_graph():
+    59                                               global lm_guesses, lm, lm_cons
+    60                                               global x_guesses, x, x_cons
+    61
+    62                                               # construct optimization objective
+    63         7       1119.3    159.9      2.4      cons = vertcat(*x_cons, *lm_cons, x[0]-DM(path[0]))
+    64                                               # and formulate our QP problem
+    65         7       1132.0    161.7      2.5      qp = {'x':vertcat(*x, *lm), 'f':cons.T@cons}
+    66
+    67                                               # possible solvers
+    68                                               # so i tried the quadratic ones because
+    69                                               # like obviously this is a quadratic programming probem
+    70                                               # but they're slower??
+    71                                               # needs more info since my computer's BLAS/LAPACK setup is
+    72                                               # entirely fucked
+    73                                               # also that's the reason all the HSL solvers are much slower
+    74                                               # on my mac for MPC, IPOPT with MA27 was like 10x faster than
+    75                                               # with MUMPS, but here, it's much slower. On WSL it's about equal
+    76                                               # so idek anymore
+    77                                               # prob best just to leave these here so we can test later
+    78
+    79                                               # also maybe because this is an unconstrained optimization problem,
+    80                                               # whereas these QP and NLP solvers are meant for constrained problems?
+    81                                               # ig the whole IP method doesn't make as much sense without the need
+    82                                               # for constraints. Since you can just optimize.
+    83
+    84                                               # solver = qpsol('solver', 'qpoases', qp, {'printLevel':'none', 'print_time':0, 'print_problem':0})
+    85                                               # solver = qpsol('solver', 'osqp', qp, {'print_time':0, 'print_problem':0})
+    86         7      29996.2   4285.2     65.1      solver = nlpsol('solver', 'ipopt', qp, solver_opts)
+    87
+    88                                               # actually solve the QP problem
+    89         7      13730.1   1961.4     29.8      soln = np.array(solver(x0=vertcat(*x_guesses, *lm_guesses))['x'])
+    90         7         17.9      2.6      0.0      split = len(x_guesses)*2
+    91
+    92         7          2.3      0.3      0.0      s = (len(x_guesses), 2)
+    93         7         26.6      3.8      0.1      x_guesses = np.array(soln[:split])
+    94         7          7.3      1.0      0.0      x_guesses.resize(s)
+    95
+    96         7          4.8      0.7      0.0      s = lm_guesses.shape
+    97         7          7.0      1.0      0.0      lm_guesses = np.array(soln[split:])
+    98         7          2.5      0.4      0.0      lm_guesses.resize(s)
+    99
+   100                                               # print(x_guesses.shape, lm_guesses.shape)
+   101         7         23.3      3.3      0.1      return list(x_guesses), lm_guesses
+
+Total time: 8.27045 s
+File: feb-recruitment/graphslam.py
+Function: main at line 104
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   104                                           @profile
+   105                                           def main():
+   106                                               global lm_guesses, lm, lm_cons
+   107                                               global x_guesses, x, x_cons
+   108                                               global left, right, path, vision_range
+   109
+   110         1          0.8      0.8      0.0      no_slam_x = [path[0]]
+   111         1          0.2      0.2      0.0      no_slam_lm = []
+   112         1          0.2      0.2      0.0      solve_times = []
+   113         7         12.5      1.8      0.0      for i in range(1, len(path)):
+   114                                                   # get fake odometry measurement
+   115         7        292.1     41.7      0.0          dx = (path[i]-path[i-1]+(random(2)*0.1)) # add noise with stdev 0.01
+   116         7         21.9      3.1      0.0          no_slam_x.append(no_slam_x[-1]+dx)
+   117                                                   # get fake observations
+   118        21        110.1      5.2      0.0          z = np.concatenate(
+   119        14        571.8     40.8      0.0              ((left[norm(left-path[i], axis=1)<vision_range]),
+   120         7        180.4     25.8      0.0              (right[norm(right-path[i], axis=1)<vision_range])),
+   121         7          2.4      0.3      0.0              axis=0
+   122         7          4.4      0.6      0.0          )-path[i]
+   123         7         48.8      7.0      0.0          z = z+random(z.shape)*1
+   124         7         16.5      2.4      0.0          no_slam_lm.append(z+no_slam_x[-1])
+   125
+   126                                                   # update graph
+   127         7          7.8      1.1      0.0          t0 = perf_counter()
+   128         7      10555.4   1507.9      0.1          update_graph(dx, z)
+   129         7          7.4      1.1      0.0          t1 = perf_counter()
+   130                                                   #* comment this line out to only solve at the end
+   131         7    8257605.3    1e+06     99.8          x_guesses, lm_guesses = solve_graph()
+   132         6         22.2      3.7      0.0          t2 = perf_counter()
+   133         6         42.8      7.1      0.0          solve_times.append([t1-t0, t2-t1, len(x_cons)+len(lm_cons)])
+   134                                                   # progress bar
+   135         6          4.1      0.7      0.0          barlen = 20
+   136         6        941.1    156.8      0.0          print(f'\r|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)}', end='')      
+   137                                               print()
+   138                                               toc = perf_counter()
+   139                                               x_guesses, lm_guesses = solve_graph()
+   140                                               tic = perf_counter()
+   141                                               print(f'solve time: {tic-toc}')

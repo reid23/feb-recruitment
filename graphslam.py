@@ -51,9 +51,12 @@ solver_opts = {
     'ipopt.print_level': 0,
     'ipopt.sb': 'yes',
     'print_time': 0,
-    # 'ipopt.linear_solver': 'MA57',
+    # 'ipopt.nlp_scaling_method':'none',
+    'ipopt.linear_solver': 'MA27',
 }
+# @profile
 def solve_graph():
+    start = perf_counter()
     global lm_guesses, lm, lm_cons
     global x_guesses, x, x_cons
 
@@ -85,6 +88,7 @@ def solve_graph():
 
     # actually solve the QP problem
     soln = np.array(solver(x0=vertcat(*x_guesses, *lm_guesses))['x'])
+    print(soln)
     split = len(x_guesses)*2
 
     s = (len(x_guesses), 2)
@@ -96,41 +100,53 @@ def solve_graph():
     lm_guesses.resize(s)
 
     # print(x_guesses.shape, lm_guesses.shape)
-    return list(x_guesses), lm_guesses
+    out = (list(x_guesses), lm_guesses, start, perf_counter())
+    # print('time: ', perf_counter()-start)
+    return out
 
 #%%
-no_slam_x = [path[0]]
-no_slam_lm = []
-solve_times = []
-for i in range(1, len(path)):
-    # get fake odometry measurement
-    dx = (path[i]-path[i-1]+(random(2)*0.1)) # add noise with stdev 0.01
-    no_slam_x.append(no_slam_x[-1]+dx)
-    # get fake observations
-    z = np.concatenate(
-        ((left[norm(left-path[i], axis=1)<vision_range]),
-        (right[norm(right-path[i], axis=1)<vision_range])),
-        axis=0
-    )-path[i]
-    z = z+random(z.shape)*1
-    no_slam_lm.append(z+no_slam_x[-1])
+# @profile
+def main():
+    global lm_guesses, lm, lm_cons
+    global x_guesses, x, x_cons
+    global left, right, path, vision_range
 
-    # update graph
-    t0 = perf_counter()
-    update_graph(dx, z)
-    t1 = perf_counter()
-    #* comment this line out to only solve at the end
+    no_slam_x = [path[0]]
+    no_slam_lm = []
+    solve_times = []
+    for i in range(1, len(path)):
+        # get fake odometry measurement
+        dx = (path[i]-path[i-1]+(random(2)*0.1)) # add noise with stdev 0.01
+        no_slam_x.append(no_slam_x[-1]+dx)
+        # get fake observations
+        z = np.concatenate(
+            ((left[norm(left-path[i], axis=1)<vision_range]),
+            (right[norm(right-path[i], axis=1)<vision_range])),
+            axis=0
+        )-path[i]
+        z = z+random(z.shape)*1
+        no_slam_lm.append(z+no_slam_x[-1])
+
+        # update graph
+        t0 = perf_counter()
+        update_graph(dx, z)
+        t1 = perf_counter()
+        #* comment this line out to only solve at the end
+        out = solve_graph()
+        t = perf_counter()
+        x_guesses, lm_guesses, start, end = out
+        t2 = perf_counter()
+        solve_times.append([t1-t0, t2-t1, len(x_cons)+len(lm_cons)])
+        # progress bar
+        barlen = 20
+        print(f'\r|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)} call to start: {start-t1:.5f}, start to end: {end-start:.5f}, end to return: {t-end:.5f}, unpack: {t2-t:.5f} total: {t2-t1:.5f}', end='')
+    print()
+    toc = perf_counter()
     x_guesses, lm_guesses = solve_graph()
-    t2 = perf_counter()
-    solve_times.append([t1-t0, t2-t1, len(x_cons)+len(lm_cons)])
-    # progress bar
-    barlen = 20
-    print(f'\r|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)}', end='')
-print()
-toc = perf_counter()
-x_guesses, lm_guesses = solve_graph()
-tic = perf_counter()
-print(f'solve time: {tic-toc}')
+    tic = perf_counter()
+    print(f'solve time: {tic-toc}')
+main()
+exit()
 # %%
 plt.style.use('dark_background')
 fig, axs = plt.subplots(2, 2, gridspec_kw=dict(height_ratios=[3,1]))
