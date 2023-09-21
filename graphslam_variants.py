@@ -30,12 +30,15 @@ class PolarGraphSLAM:
         self.lmhat = []
         self.lm_edges = []
 
+    @np.vectorize
+    def cartesian(x):
+        return np.array([x[0]*np.cos(x[1]), x[0]*np.sin(x[1])])
     def update_graph(self, dx, z):
         """updates graph given odo and lm measurements
 
         Args:
             dx (ndarray): vector of shape (3, 1) describing the estimated change in [x, y, theta]^T since the previous update 
-            z (ndarray): vector of shape (m, 2) describing locations of m landmarks relative to the car
+            z (ndarray): vector of shape (m, 2) describing locations of m landmarks relative to the car in form [r, theta]
         """
         self.xhat.append(self.xhat[-1]+dx)
         curpos = self.xhat[-1]
@@ -43,6 +46,9 @@ class PolarGraphSLAM:
         self.x.append(MX.sym(f'x{len(self.x)}', 3))
         self.x_edges.append((self.x[-1]+DM(dx)-self.x[-1]))
 
+        z = z + np.array([0, curpos[2]])
+        z = PolarGraphSLAM.cartesian(z)
+        
         if self.firstupdate:
             self.firstupdate = False
             self.lmhat = z+curpos
