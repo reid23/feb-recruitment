@@ -7,13 +7,16 @@ from numpy.random import random
 import matplotlib.pyplot as plt
 from time import perf_counter
 
-path = get_test_track()
-path = np.array([path[i] for i in range(path.shape[0]) if i%5==0])
-# path = path-path[0]
-left = offset_path(path, 4)
-right = offset_path(path, -4)
-left = np.array([left[i] for i in range(path.shape[0]) if i%1==0])
-right = np.array([right[i] for i in range(path.shape[0]) if i%1==0])
+def get_path():
+    path = get_test_track()
+    path = np.array([path[i] for i in range(path.shape[0]) if i%5==0])
+    # path = path-path[0]
+    left = offset_path(path, 4)
+    right = offset_path(path, -4)
+    left = np.array([left[i] for i in range(path.shape[0]) if i%1==0])
+    right = np.array([right[i] for i in range(path.shape[0]) if i%1==0])
+    return path, left, right
+path, left, right = get_path()
 
 #%%
 class Sim:
@@ -45,7 +48,6 @@ class Sim:
     def rot(self, a):
         return np.array([[np.cos(a), -np.sin(a)],[np.sin(a), np.cos(a)]])
     def get_step(self, mode=CARTESIAN):
-
         if self.record_no_slam:
             self.no_slam_x.append(no_slam_x[-1]+dx)
             self.no_slam_lm.append(z+no_slam_x[-1])
@@ -64,10 +66,22 @@ class Sim:
             axis=0
         )-path[self.idx]
         if mode == Sim.POLAR:
-            dx = path[self.idx] - path[self.idx-1]
             z = self.rot(np.arccos(dx[0]/norm(dx)))@z
-        
+            norm_z = z/norm(z, axis=1)
+            z = np.concatenate(norm(z, axis=1), np.arctan(norm_z[:, 1]/norm_z[:, 0]), axis=1)
+        self.idx += 1
         return dx+self.dx_noise((2,)), z+self.z_noise(z.shape)
+    def __iter__(self):
+        self.idx=0
+        self.no_slam_x = []
+        self.no_slam_m = []
+        self._update()
+        return self
+    def __next__(self):
+        if self.idx==len(self.path):
+            raise StopIteration
+        out = self.get_step()
+        return out
 
 
 
