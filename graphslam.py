@@ -48,11 +48,12 @@ def update_graph(dx, z):
         lm_cons.append((x[-1] + DM(i) - lm[idx]))
 
 solver_opts = {
-    'ipopt.print_level': 0,
-    'ipopt.sb': 'yes',
-    'print_time': 0,
+    # 'ipopt.print_level': 1,
+    # 'ipopt.sb': 'no',
+    # 'print_time': 1,
     # 'ipopt.nlp_scaling_method':'none',
     'ipopt.linear_solver': 'MA27',
+    'ipopt.print_timing_statistics': 'yes',
 }
 # @profile
 def solve_graph():
@@ -85,10 +86,11 @@ def solve_graph():
     # solver = qpsol('solver', 'qpoases', qp, {'printLevel':'none', 'print_time':0, 'print_problem':0})
     # solver = qpsol('solver', 'osqp', qp, {'print_time':0, 'print_problem':0})
     solver = nlpsol('solver', 'ipopt', qp, solver_opts)
-
+    end = perf_counter()
     # actually solve the QP problem
     soln = np.array(solver(x0=vertcat(*x_guesses, *lm_guesses))['x'])
-    print(soln)
+
+    # print(soln)
     split = len(x_guesses)*2
 
     s = (len(x_guesses), 2)
@@ -100,7 +102,7 @@ def solve_graph():
     lm_guesses.resize(s)
 
     # print(x_guesses.shape, lm_guesses.shape)
-    out = (list(x_guesses), lm_guesses, start, perf_counter())
+    out = (list(x_guesses), lm_guesses, start, end)
     # print('time: ', perf_counter()-start)
     return out
 
@@ -139,10 +141,10 @@ def main():
         solve_times.append([t1-t0, t2-t1, len(x_cons)+len(lm_cons)])
         # progress bar
         barlen = 20
-        print(f'\r|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)} call to start: {start-t1:.5f}, start to end: {end-start:.5f}, end to return: {t-end:.5f}, unpack: {t2-t:.5f} total: {t2-t1:.5f}', end='')
+        print(f'|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)} call to start: {start-t1:.5f}, start to end: {end-start:.5f}, end to return: {t-end:.5f}, unpack: {t2-t:.5f} total: {t2-t1:.5f}', end='\n')
     print()
     toc = perf_counter()
-    x_guesses, lm_guesses = solve_graph()
+    thing = solve_graph()
     tic = perf_counter()
     print(f'solve time: {tic-toc}')
 main()

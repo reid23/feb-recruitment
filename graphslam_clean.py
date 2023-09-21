@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 from time import perf_counter
 
 path = get_test_track()
-path = np.array([path[i] for i in range(path.shape[0]) if i%3==0])
+path = np.array([path[i] for i in range(path.shape[0]) if i%5==0])
 # path = path-path[0]
 left = offset_path(path, 4)
 right = offset_path(path, -4)
-left = np.array([left[i] for i in range(path.shape[0]) if i%2==0])
-right = np.array([right[i] for i in range(path.shape[0]) if i%2==0])
+left = np.array([left[i] for i in range(path.shape[0]) if i%1==0])
+right = np.array([right[i] for i in range(path.shape[0]) if i%1==0])
 
 #%%
 class Sim:
@@ -89,11 +89,11 @@ class GraphSLAM:
             'ipopt.print_level': 0,
             'ipopt.sb': 'yes',
             'print_time': 0,
-            # 'ipopt.linear_solver': 'MA77'
+            'ipopt.linear_solver': 'MA57'
         }
         self.__dict__.update(settings) # sketchy but nobody's hacking us
 
-        self.Q = lambda n: DM_eye(n)
+        self.Q = lambda n: DM_eye(n)*3
         self.R = lambda n: DM_eye(n)
 
     def update_graph(self, dx, z):
@@ -107,7 +107,7 @@ class GraphSLAM:
         curpos = self.xhat[-1]
         
         self.x.append(MX.sym(f'x{len(self.x)}', 2))
-        self.x_edges.append((self.x[-1]+DM(dx)-self.x[-1]))
+        self.x_edges.append((self.x[-2]+DM(dx)-self.x[-1]))
 
         if self.firstupdate:
             self.firstupdate = False
@@ -188,7 +188,7 @@ for i in range(1, len(path)):
     barlen = 20
     print(f'\r|{"@"*int(np.ceil(barlen*(i+1)/len(path)))}{"."*(barlen-int(np.floor(barlen*(i+1)/len(path))))}| {i+1}/{len(path)}', end='')
 # %%
-plt.style.use('dark_background')
+# plt.style.use('dark_background')
 fig, axs = plt.subplots(2, 2, gridspec_kw=dict(height_ratios=[3,1]))
 
 # plot true track
