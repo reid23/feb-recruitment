@@ -10,10 +10,10 @@ class PolarGraphSLAM:
         self.firstupdate = True
         self.landmarkTolerance = 2
         self.solver_opts = {
-            'ipopt.print_level': 0,
-            'ipopt.sb': 'yes',
-            'print_time': 0,
-            # 'ipopt.linear_solver': 'MA77'
+            # 'ipopt.print_level': 0,
+            # 'ipopt.sb': 'yes',
+            # 'print_time': 0,
+            # 'ipopt.linear_solver': 'MA57'
         }
 
         self.Q = lambda n: DM_eye(n)
@@ -32,11 +32,11 @@ class PolarGraphSLAM:
         self.lm_edges = []
 
         r, t = SX.sym('r'), SX.sym('t')
-        self.cartesianCasadi=Function('cart', (r, t), vertcat(r*sin(t), r*cos(t)))
+        self.cartesianCasadi=Function('cart', (r, t), (vertcat(r*cos(t), r*sin(t)),))
 
-    @np.vectorize
-    def cartesian(x):
-        return np.array([x[0]*np.cos(x[1]), x[0]*np.sin(x[1])])
+    def cartesian(X):
+        return np.array([[x[0]*np.cos(x[1]), x[0]*np.sin(x[1])] for x in X])
+    
     def update_graph(self, dx, z):
         """updates graph given odo and lm measurements
 
@@ -51,36 +51,40 @@ class PolarGraphSLAM:
         # this kinda worked for mecanum robots, since it made things differentiable
         # but it works much better for cars because they *do* move in circles
         self.dxhat.append(dx)
+        
         r = dx[0]/dx[1]
         #            [    Dx              Dy       D theta]
         D = np.array([r*cos(dx[1])-r, r*sin(dx[1]), dx[1]])
+        D = np.array([(dx[0]*(cos(dx[1])-1))/dx[1]])
         self.xhat.append(self.xhat[-1]+D)
         curpos = self.xhat[-1]
         
         self.dx.append(MX.sym(f'dx{len(self.dx)}', 2)) # symbolic dx, dtheta
         r = self.dx[-1][0]/self.dx[-1][1]
 
-        self.x.append(self.x[-1]+vertcat(r*cos(self.dx[-1][1])-r, r*sin(self.dx[-1][1]), self.dx[-1][1])) # symbolic x, y, angle
+        # self.x.append(self.x[-1]+vertcat(r*cos(self.dx[-1][1])-r, r*sin(self.dx[-1][1]), self.dx[-1][1])) # symbolic x, y, angle
+        self.x.append(self.x[-1]+vertcat((self.dx[-1][0]*(cos(self.dx[-1][1])-1))/self.dx[-1][1], (self.dx[-1][0]*(sin(self.dx[-1][1])-1))/self.dx[-1][1], self.dx[-1][1]))
         self.x_edges.append(self.dx[-1]-DM(dx))
         
 
-        z=DM(z)+repmat(SX([0, 0, self.x[-1][-1]]), z.shape[0], 1)
-        z=[self.cartesianCasading(*i) for i in z] # symbolic
-        
         zhat = np.copy(z)
+        z=DM(z)+repmat(vertcat(0, self.x[-1][-1]), 1, z.shape[0]).T
+        # print(z.shape, len(vertsplit(z)))
+        z=[self.cartesianCasadi(*horzsplit(i)) for i in vertsplit(z)] # symbolic
+        
         zhat[:, 1] += np.ones(zhat.shape[0])*self.xhat[-1][-1]
         zhat = PolarGraphSLAM.cartesian(zhat)
         
         if self.firstupdate:
             self.firstupdate = False
-            self.lmhat = z+curpos[:2] # add x and y
-            self.lm = [MX.sym(f'lm{i}', 2) for i in range(z.shape[0])]
-            self.lm_edges = [self.x[-1][:2] + z[i] - self.lm[i] for i in range(z.shape[0])]
+            self.lmhat = zhat+curpos[:2] # add x and y
+            self.lm = [MX.sym(f'lm{i}', 2) for i in range(len(z))]
+            self.lm_edges = [self.x[-1][:2] + z[i] - self.lm[i] for i in range(len(z))]
         for i in range(len(z)):
-            idx = np.argmin(dists:=norm(self.lmhat-(zhat[i]+curpos), axis=1))
+            idx = np.argmin(dists:=norm(self.lmhat-(zhat[i]+curpos[:2]), axis=1))
             if dists[idx] > self.landmarkTolerance:
                 idx = len(self.lmhat)
-                self.lmhat = np.concatenate((self.lmhat, (zhat[i]+curpos)[np.newaxis]), axis=0)
+                self.lmhat = np.concatenate((self.lmhat, (zhat[i]+curpos[:2])[np.newaxis]), axis=0)
                 self.lm.append(MX.sym(f'lm{idx}', 2))
             self.lm_edges.append((self.x[-1][:2] + z[i] - self.lm[idx])) # x + z_i = lm_i
     
