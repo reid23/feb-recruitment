@@ -75,13 +75,7 @@ class Sim:
 class GraphSLAM:
     def __init__(self, **settings):
         self.x0 = np.array([0,0])
-        self.x = [MX.sym('x0', 2)]
-        self.xhat = [self.x0]
-        self.x_edges = []
 
-        self.lm = []
-        self.lmhat = []
-        self.lm_edges = []
 
         self.firstupdate = True
         self.landmarkTolerance = 2
@@ -91,10 +85,20 @@ class GraphSLAM:
             'print_time': 0,
             'ipopt.linear_solver': 'MA57'
         }
-        self.__dict__.update(settings) # sketchy but nobody's hacking us
 
         self.Q = lambda n: DM_eye(n)*3
         self.R = lambda n: DM_eye(n)
+
+        self.__dict__.update(settings) # sketchy but nobody's hacking us
+
+        # these things are after since they shouldn't be settings
+
+        self.x = [MX.sym('x0', 2)]
+        self.xhat = [self.x0]
+        self.x_edges = []
+        self.lm = []
+        self.lmhat = []
+        self.lm_edges = []
 
     def update_graph(self, dx, z):
         """updates graph given odo and lm measurements
@@ -113,7 +117,7 @@ class GraphSLAM:
             self.firstupdate = False
             self.lmhat = z+curpos
             self.lm = [MX.sym(f'lm{i}', 2) for i in range(z.shape[0])]
-            self.lm_edges = [self.x[-1] + DM(z[i]) - self.lm[i] for i in range(len(z))]
+            self.lm_edges = [self.x[-1] + DM(z[i]) - self.lm[i] for i in range(z.shape[0])]
         for i in z:
             idx = np.argmin(dists:=norm(self.lmhat-(i+curpos), axis=1))
             if dists[idx] > self.landmarkTolerance:
