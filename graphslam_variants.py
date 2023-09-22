@@ -13,7 +13,7 @@ class PolarGraphSLAM:
             # 'ipopt.print_level': 0,
             # 'ipopt.sb': 'yes',
             # 'print_time': 0,
-            # 'ipopt.linear_solver': 'MA57'
+            'ipopt.linear_solver': 'MA77'
         }
 
         self.Q = lambda n: DM_eye(n)
@@ -33,7 +33,9 @@ class PolarGraphSLAM:
 
         r, t = SX.sym('r'), SX.sym('t')
         self.cartesianCasadi=Function('cart', (r, t), (vertcat(r*cos(t), r*sin(t)),))
-
+        theta = SX.sym('theta')
+        self.sinc=Function('sinc', (theta,), (sum([((-1)**n)*(theta**(2*n))/(np.math.factorial(2*n+1)) for n in range(4)]),))
+        self.cosc=Function('cosc', (theta,), (-theta/2 + (theta**3)/24 - (theta**5)/720 + (theta**7)/40320,))
     def cartesian(X):
         return np.array([[x[0]*np.cos(x[1]), x[0]*np.sin(x[1])] for x in X])
     
@@ -52,18 +54,18 @@ class PolarGraphSLAM:
         # but it works much better for cars because they *do* move in circles
         self.dxhat.append(dx)
         
-        r = dx[0]/dx[1]
+        # r = dx[0]/dx[1]
         #            [    Dx              Dy       D theta]
-        D = np.array([r*cos(dx[1])-r, r*sin(dx[1]), dx[1]])
-        D = np.array([(dx[0]*(cos(dx[1])-1))/dx[1]])
+        D = np.array([dx[0]*float(self.cosc(dx[1])), dx[0]*float(self.sinc(dx[1])), dx[1]])
+        # D = np.array([(dx[0]*(cos(dx[1])-1))/dx[1]])
         self.xhat.append(self.xhat[-1]+D)
         curpos = self.xhat[-1]
         
         self.dx.append(MX.sym(f'dx{len(self.dx)}', 2)) # symbolic dx, dtheta
-        r = self.dx[-1][0]/self.dx[-1][1]
+        # r = self.dx[-1][0]/self.dx[-1][1]
 
-        # self.x.append(self.x[-1]+vertcat(r*cos(self.dx[-1][1])-r, r*sin(self.dx[-1][1]), self.dx[-1][1])) # symbolic x, y, angle
-        self.x.append(self.x[-1]+vertcat((self.dx[-1][0]*(cos(self.dx[-1][1])-1))/self.dx[-1][1], (self.dx[-1][0]*(sin(self.dx[-1][1])-1))/self.dx[-1][1], self.dx[-1][1]))
+        self.x.append(self.x[-1]+vertcat(self.dx[-1][0]*self.cosc(self.dx[-1][1]), self.dx[-1][0]*self.sinc(self.dx[-1][1]), self.dx[-1][1])) # symbolic x, y, angle
+        # self.x.append(self.x[-1]+vertcat((self.dx[-1][0]*(cos(self.dx[-1][1])-1))/self.dx[-1][1], (self.dx[-1][0]*(sin(self.dx[-1][1])-1))/self.dx[-1][1], self.dx[-1][1]))
         self.x_edges.append(self.dx[-1]-DM(dx))
         
 
@@ -124,10 +126,24 @@ class PolarGraphSLAM:
     
 if __name__ == '__main__':
     from graphslam_clean import Sim, get_path
+    import matplotlib.pyplot as plt
     path, _, _ = get_path()
-    sim = Sim(path, 4, lambda shape: np.random.random(shape)/10, lambda shape: np.random.random(shape)*2)
+    sim = Sim(
+        path, 
+        4, 
+        lambda shape: np.random.random(shape)/10, 
+        lambda shape: np.random.random(shape)*2,
+        pose_divider=5,
+        lm_divider=5,
+    )
     slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], 0]))
+    count = 0
     for dx, z in sim:
         slam.update_graph(dx, z)
-        slam.solve_graph()
+        print(count)
+        count += 1
+        if count > 30: break
     
+    slam.solve_graph()
+    plt.scatter(*np.array(slam.lmhat).T)
+    plt.show()
