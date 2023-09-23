@@ -55,6 +55,7 @@ class PolarGraphSLAM:
         # we assume we moved in a circle, which will give us better integration
         # this kinda worked for mecanum robots, since it made things differentiable
         # but it works much better for cars because they *do* move in circles
+        # dx[1] += self.x0[-1]
         self.dxhat.append(dx)
         
         # r = dx[0]/dx[1]
@@ -162,9 +163,13 @@ if __name__ == '__main__':
             landmarks.append(start+(sim.rot(angle+i[1])@np.array([[i[0]],[0]])).flatten())
         count += 1
         # if count > 30: break
-    plt.scatter(*np.array(path).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
+    # plt.scatter(*np.array(path).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
     # plt.scatter(*np.array(landmarks).T, c=np.linspace(0, 1, len(landmarks)), cmap='coolwarm')
     # plt.scatter(*np.array(states).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
     # slam.solve_graph()
-    plt.scatter(*np.array(slam.lmhat)[:, :2].T, c=np.linspace(0, 1, len(slam.lmhat)), cmap='coolwarm')
+    
+    fig, ax = plt.subplots()
+    ax.scatter(*(np.array(slam.xhat)[:, :2]).T, c=np.linspace(0, 1, len(slam.xhat)), cmap='coolwarm')
+    for i in slam.xhat:
+        ax.annotate(round(i[-1], 1), i[:2])
     plt.show()
