@@ -42,11 +42,11 @@ class Sim:
         """
         if self.shift_to_origin:
             self.path -= self.path[0]
-        self.x = np.array([path[i] for i in range(path.shape[0]) if i%self.pose_divider==0])
-        self.left = offset_path(path, self.width/2)
-        self.right = offset_path(path, -self.width/2)
-        self.left = np.array([left[i] for i in range(left.shape[0]) if i%self.lm_divider==0])
-        self.right = np.array([right[i] for i in range(right.shape[0]) if i%self.lm_divider==0])
+        self.x = np.array([self.path[i] for i in range(self.path.shape[0]) if i%self.pose_divider==0])
+        self.left = offset_path(self.path, self.width/2)
+        self.right = offset_path(self.path, -self.width/2)
+        self.left = np.array([self.left[i] for i in range(self.left.shape[0]) if i%self.lm_divider==0])
+        self.right = np.array([self.right[i] for i in range(self.right.shape[0]) if i%self.lm_divider==0])
     def rot(self, a):
         return np.array([[np.cos(a), -np.sin(a)],[np.sin(a), np.cos(a)]])
     def get_step(self):
@@ -56,6 +56,8 @@ class Sim:
             (self.right[norm(self.right-self.path[self.idx], axis=1)<self.vision_range])),
             axis=0
         )-self.path[self.idx]
+        # plt.scatter(*(z+self.path[self.idx]).T)
+        # plt.show()
         dx = self.path[self.idx]-self.path[self.idx-1]
 
         if self.record_no_slam:
@@ -67,8 +69,8 @@ class Sim:
             dx = self.path[self.idx]-self.path[self.idx-1]
             dx_prev = self.path[self.idx-1]-self.path[self.idx-2]
             dx_out = np.array([norm(dx), (1 if det(np.concatenate((dx_prev[:, np.newaxis], dx[:, np.newaxis]), axis=1))>0 else -1)*np.arccos(dx@dx_prev/(norm(dx)*norm(dx_prev)))]) # convert to polar
-
-            z = (self.rot((1 if det(np.concatenate((np.array([[1],[0]]), dx[:, np.newaxis]), axis=1))>0 else -1)*np.arccos(dx@np.array([1,0])/norm(dx)))@(z.T)).T
+            
+            z = (self.rot(-(1 if det(np.concatenate((np.array([[1],[0]]), dx[:, np.newaxis]), axis=1))>0 else -1)*np.arccos(dx@np.array([1,0])/norm(dx)))@(z.T)).T
             norm_z = z/norm(z, axis=1, keepdims=True)
             # print((norm_z[:, 1]/norm_z[:, 0])[:, np.newaxis].shape)
             # print(norm(z, axis=1, keepdims=True).shape)

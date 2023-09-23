@@ -149,18 +149,22 @@ if __name__ == '__main__':
     start = np.array([0.0,0.0])
     angle = 0
     states = []
+    landmarks = []
     for dx, z in sim:
         angle += dx[1]
+        #TODO: implement stupid test here for measurements. Isolate errors in this file or Sim
         # Sim.rot(angle)@np.array([[dx[1]], [0]])
         states.append(list(start))
         start += (sim.rot(angle)@np.array([[dx[0]], [0]])).flatten()
         slam.update_graph(dx, z)
         # print(count)
+        for i in z:
+            landmarks.append(start+(sim.rot(angle+i[1])@np.array([[i[0]],[0]])).flatten())
         count += 1
         # if count > 30: break
     plt.scatter(*np.array(path).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
-    
-    plt.scatter(*np.array(states).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
+    # plt.scatter(*np.array(landmarks).T, c=np.linspace(0, 1, len(landmarks)), cmap='coolwarm')
+    # plt.scatter(*np.array(states).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
+    # slam.solve_graph()
     plt.scatter(*np.array(slam.lmhat)[:, :2].T, c=np.linspace(0, 1, len(slam.lmhat)), cmap='coolwarm')
     plt.show()
-    # slam.solve_graph()
