@@ -31,6 +31,8 @@ class PolarGraphSLAM:
         self.lmhat = []
         self.lm_edges = []
 
+        self.silly = []
+
         r, t = SX.sym('r'), SX.sym('t')
         self.cartesianCasadi=Function('cart', (r, t), (vertcat(r*cos(t), r*sin(t)),))
         theta = SX.sym('theta')
@@ -38,7 +40,8 @@ class PolarGraphSLAM:
         self.cosc=Function('cosc', (theta,), (-theta/2 + (theta**3)/24 - (theta**5)/720 + (theta**7)/40320,))
     def cartesian(X):
         return np.array([[x[0]*np.cos(x[1]), x[0]*np.sin(x[1])] for x in X])
-    
+    def rot(angle):
+        return np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     def update_graph(self, dx, z):
         """updates graph given odo and lm measurements
 
@@ -56,7 +59,11 @@ class PolarGraphSLAM:
         
         # r = dx[0]/dx[1]
         #            [    Dx              Dy       D theta]
-        D = np.array([dx[0]*float(self.cosc(dx[1])), dx[0]*float(self.sinc(dx[1])), dx[1]])
+        D = np.array([dx[0]*float(self.cosc(dx[1])), 
+                      dx[0]*float(self.sinc(dx[1])), 
+                      dx[1]])
+        # self.silly.append(self.silly[-1]+D[:2])
+        D[:2] = PolarGraphSLAM.rot(self.xhat[-1][-1])@D[:2]
         # D = np.array([(dx[0]*(cos(dx[1])-1))/dx[1]])
         self.xhat.append(self.xhat[-1]+D)
         curpos = self.xhat[-1]
@@ -131,19 +138,29 @@ if __name__ == '__main__':
     sim = Sim(
         path, 
         4, 
-        lambda shape: np.random.random(shape)/10, 
-        lambda shape: np.random.random(shape)*2,
-        pose_divider=5,
-        lm_divider=5,
+        lambda shape: np.random.random(shape)*0.00001, 
+        lambda shape: np.random.random(shape)*0.001,
+        pose_divider=2,
+        lm_divider=3,
+        mode=Sim.POLAR
     )
-    slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], 0]))
+    slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], -np.pi/2]))
     count = 0
+    start = np.array([0.0,0.0])
+    angle = 0
+    states = []
     for dx, z in sim:
+        angle += dx[1]
+        # Sim.rot(angle)@np.array([[dx[1]], [0]])
+        states.append(list(start))
+        start += (sim.rot(angle)@np.array([[dx[0]], [0]])).flatten()
         slam.update_graph(dx, z)
-        print(count)
+        # print(count)
         count += 1
-        if count > 30: break
+        # if count > 30: break
+    plt.scatter(*np.array(path).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
     
-    slam.solve_graph()
-    plt.scatter(*np.array(slam.lmhat).T)
+    plt.scatter(*np.array(states).T, c=np.linspace(0, 1, len(states)), cmap='coolwarm')
+    plt.scatter(*np.array(slam.lmhat)[:, :2].T, c=np.linspace(0, 1, len(slam.lmhat)), cmap='coolwarm')
     plt.show()
+    # slam.solve_graph()

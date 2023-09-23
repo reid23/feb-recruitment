@@ -22,12 +22,13 @@ path, left, right = get_path()
 class Sim:
     CARTESIAN = 1
     POLAR = 2
-    def __init__(self, path, width, odo_noise_func, measurement_noise_func, vision_range=10, pose_divider=2, lm_divider=3, shift_to_origin=True, record_no_slam=True):
+    def __init__(self, path, width, odo_noise_func, measurement_noise_func, vision_range=10, pose_divider=2, lm_divider=3, shift_to_origin=True, record_no_slam=True, mode=CARTESIAN):
         self.path = path
         self.width = width
         self.pose_divider = pose_divider
         self.lm_divider = lm_divider
         self.shift_to_origin = shift_to_origin
+        self.mode=mode
         self.idx = 0
         self.dx_noise = odo_noise_func
         self.z_noise = measurement_noise_func
@@ -48,33 +49,36 @@ class Sim:
         self.right = np.array([right[i] for i in range(right.shape[0]) if i%self.lm_divider==0])
     def rot(self, a):
         return np.array([[np.cos(a), -np.sin(a)],[np.sin(a), np.cos(a)]])
-    def get_step(self, mode=CARTESIAN):
+    def get_step(self):
         # get fake observations
         z = np.concatenate(
-            ((left[norm(left-path[self.idx], axis=1)<self.vision_range]), # change when creating an actual sim class
-            (right[norm(right-path[self.idx], axis=1)<self.vision_range])),
+            ((self.left[norm(self.left-self.path[self.idx], axis=1)<self.vision_range]), # change when creating an actual sim class
+            (self.right[norm(self.right-self.path[self.idx], axis=1)<self.vision_range])),
             axis=0
-        )-path[self.idx]
-        dx = path[self.idx]-path[self.idx-1]
+        )-self.path[self.idx]
+        dx = self.path[self.idx]-self.path[self.idx-1]
 
         if self.record_no_slam:
-            dx = path[self.idx]-path[self.idx-1]
+            dx = self.path[self.idx]-self.path[self.idx-1]
             self.no_slam_x.append(self.no_slam_x[-1]+dx)
             self.no_slam_m.append(z+self.no_slam_x[-1])
 
-        if mode == Sim.POLAR:
-            dx = path[self.idx]-path[self.idx-1]
-            dx_prev = path[self.idx-1]-path[self.idx-2]
-            dx = np.array([norm(dx), np.arccos(dx@dx_prev/(norm(dx)*norm(dx_prev)))]) # convert to polar
+        if self.mode == Sim.POLAR:
+            dx = self.path[self.idx]-self.path[self.idx-1]
+            dx_prev = self.path[self.idx-1]-self.path[self.idx-2]
+            dx_out = np.array([norm(dx), (1 if det(np.concatenate((dx_prev[:, np.newaxis], dx[:, np.newaxis]), axis=1))>0 else -1)*np.arccos(dx@dx_prev/(norm(dx)*norm(dx_prev)))]) # convert to polar
 
-            z = self.rot(np.arccos(dx[0]/norm(dx)))@z
-            norm_z = z/norm(z, axis=1)
-            z = np.concatenate(norm(z, axis=1), np.arctan(norm_z[:, 1]/norm_z[:, 0]), axis=1)
+            z = (self.rot((1 if det(np.concatenate((np.array([[1],[0]]), dx[:, np.newaxis]), axis=1))>0 else -1)*np.arccos(dx@np.array([1,0])/norm(dx)))@(z.T)).T
+            norm_z = z/norm(z, axis=1, keepdims=True)
+            # print((norm_z[:, 1]/norm_z[:, 0])[:, np.newaxis].shape)
+            # print(norm(z, axis=1, keepdims=True).shape)
+            # print(((np.sign([det(np.concatenate((np.array([[1],[0]]),norm_z[i][:, np.newaxis]), axis=1)) for i in range(norm_z.shape[0])])*np.arccos(norm_z[:, 0]))[:, np.newaxis]).shape)
+            z = np.concatenate((norm(z, axis=1, keepdims=True), (np.sign([det(np.concatenate((np.array([[1],[0]]),norm_z[i][:, np.newaxis]), axis=1)) for i in range(norm_z.shape[0])])*np.arccos(norm_z[:, 0]))[:, np.newaxis]), axis=1)
         self.idx += 1
-        return dx+self.dx_noise((2,)), z+self.z_noise(z.shape)
+        return dx_out+self.dx_noise((2,)), z+self.z_noise(z.shape)
     def __iter__(self):
         self.idx=0
-        self.no_slam_x = [path[0]]
+        self.no_slam_x = [self.path[0]]
         self.no_slam_m = []
         self._update()
         return self
