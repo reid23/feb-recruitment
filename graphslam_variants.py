@@ -2,6 +2,7 @@ import numpy as np
 from numpy.linalg import *
 from casadi import *
 
+### STATUS: BORKED
 class PolarGraphSLAM:
     def __init__(self, **settings):
         self.x0 = np.array([0,0,0])
@@ -132,9 +133,12 @@ class PolarGraphSLAM:
         self.lmhat = list(new_lmhat)
         return list(new_xhat), list(new_lmhat)
 
+
+
+### STATUS: BORKED
 class LinearGraphSLAM:
     def __init__(self, **settings):
-        self.x0 = np.array([0,0])
+        self.x0 = np.array([[0,0]])
 
 
         self.firstupdate = True
@@ -148,7 +152,7 @@ class LinearGraphSLAM:
         # these things are after since they shouldn't be settings
         self.nx = 1
         self.nm = 0
-        self.A = np.array([[1,0],[0,1]])
+        self.A = np.array([[1, 0, 1, 0],[0, 1, 0, 1]])
         self.b = np.copy(self.x0)
         self.xhat = self.x0
         self.lmhat = np.array([])
@@ -162,7 +166,11 @@ class LinearGraphSLAM:
         """
         self.xhat += dx
         l = self.A.shape[1]
-
+        # print(self.A.shape)
+        print(([
+            [0]*(self.nx*2 - 2) + [-1, 0, 1] + [0]*(l - self.nx*2 - 1), # add equation x_k - x_(k-1) = dx_k
+            [0]*(self.nx*2 - 1) + [-1, 0, 1] + [0]*(l - self.nx*2 - 2), # add equation y_k - y_(k-1) = dy_k
+        ]))
         self.A = np.append(self.A, np.array([
             [0]*(self.nx*2 - 2) + [-1, 0, 1] + [0]*(l - self.nx*2 - 1), # add equation x_k - x_(k-1) = dx_k
             [0]*(self.nx*2 - 1) + [-1, 0, 1] + [0]*(l - self.nx*2 - 2), # add equation y_k - y_(k-1) = dy_k
@@ -192,9 +200,16 @@ class LinearGraphSLAM:
             if dists[idx] > self.landmarkTolerance:
                 idx = len(self.lmhat)
                 self.lmhat = np.concatenate((self.lmhat, i[np.newaxis]), axis=0)
-                self.lm.append(MX.sym(f'lm{idx}', 2))
-            self.lm_edges.append((self.x[-1] + DM(i) - self.lm[idx])) # x + z_i = lm_i
-    
+                self.A = np.append(self.A, np.zeros((self.A.shape[0], 2)), axis=1)
+                self.A[-2, -2] = 1
+                self.A[-1, -1] = 1
+            self.A = np.append(self.A, np.zeros((2, self.A.shape[1])), axis=0)
+            self.A[-2, self.nx*2]       = 1
+            self.A[-1, self.nx*2+1]     = 1
+            self.A[-2, self.nx+idx*2]   = 1
+            self.A[-1, self.nx+idx*2+1] = 1
+        self.nx += 1
+        self.nm += len(z)
     def solve_graph(self):
         """solves the graph and updates everything
         """
@@ -239,9 +254,10 @@ if __name__ == '__main__':
         lambda shape: np.random.random(shape)*0.001,
         pose_divider=2,
         lm_divider=3,
-        mode=Sim.POLAR
+        # mode=Sim.POLAR
     )
-    slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], -np.pi/2]))
+    # slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], -np.pi/2]))
+    slam = LinearGraphSLAM(x0=np.array([0.0,0.0]))
     count = 0
     start = np.array([0.0,0.0])
     angle = 0

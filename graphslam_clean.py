@@ -76,8 +76,9 @@ class Sim:
             # print(norm(z, axis=1, keepdims=True).shape)
             # print(((np.sign([det(np.concatenate((np.array([[1],[0]]),norm_z[i][:, np.newaxis]), axis=1)) for i in range(norm_z.shape[0])])*np.arccos(norm_z[:, 0]))[:, np.newaxis]).shape)
             z = np.concatenate((norm(z, axis=1, keepdims=True), (np.sign([det(np.concatenate((np.array([[1],[0]]),norm_z[i][:, np.newaxis]), axis=1)) for i in range(norm_z.shape[0])])*np.arccos(norm_z[:, 0]))[:, np.newaxis]), axis=1)
+            dx = dx_out
         self.idx += 1
-        return dx_out+self.dx_noise((2,)), z+self.z_noise(z.shape)
+        return dx+self.dx_noise((2,)), z+self.z_noise(z.shape)
     def __iter__(self):
         self.idx=0
         self.no_slam_x = [self.path[0]]
