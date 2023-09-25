@@ -36,6 +36,7 @@ class PolarGraphSLAM:
 
         r, t = SX.sym('r'), SX.sym('t')
         self.cartesianCasadi=Function('cart', (r, t), (vertcat(r*cos(t), r*sin(t)),))
+
         theta = SX.sym('theta')
         self.sinc=Function('sinc', (theta,), (sum([((-1)**n)*(theta**(2*n))/(np.math.factorial(2*n+1)) for n in range(4)]),))
         self.cosc=Function('cosc', (theta,), (-theta/2 + (theta**3)/24 - (theta**5)/720 + (theta**7)/40320,))
@@ -59,28 +60,30 @@ class PolarGraphSLAM:
         # dx[1] += self.x0[-1]
         self.dxhat.append(dx)
         
-        # r = dx[0]/dx[1]
-        #            [    Dx              Dy       D theta]
-        D = np.array([dx[0]*float(self.cosc(dx[1])), 
-                      dx[0]*float(self.sinc(dx[1])), 
-                      dx[1]])
-        # self.silly.append(self.silly[-1]+D[:2])
+        # get displacement vector
+        D = np.array([[dx[0]*float(self.cosc(dx[1]))], 
+                      [dx[0]*float(self.sinc(dx[1]))], 
+                      [dx[1]]])
+        
+        # convert to cartesian
         D[:2] = PolarGraphSLAM.rot(self.xhat[-1][-1])@D[:2]
-        # D = np.array([(dx[0]*(cos(dx[1])-1))/dx[1]])
-        self.xhat.append(self.xhat[-1]+D)
+
+        self.xhat.append(self.xhat[-1]+D.flatten())
         curpos = self.xhat[-1]
         
         self.dx.append(MX.sym(f'dx{len(self.dx)}', 2)) # symbolic dx, dtheta
         # r = self.dx[-1][0]/self.dx[-1][1]
 
-        self.x.append(self.x[-1]+vertcat(self.dx[-1][0]*self.cosc(self.dx[-1][1]), self.dx[-1][0]*self.sinc(self.dx[-1][1]), self.dx[-1][1])) # symbolic x, y, angle
+        self.x.append(self.x[-1]+vertcat(self.dx[-1][0]*self.cosc(self.dx[-1][1]), 
+                                         self.dx[-1][0]*self.sinc(self.dx[-1][1]), 
+                                         self.dx[-1][1])) # symbolic x, y, angle
+        
         # self.x.append(self.x[-1]+vertcat((self.dx[-1][0]*(cos(self.dx[-1][1])-1))/self.dx[-1][1], (self.dx[-1][0]*(sin(self.dx[-1][1])-1))/self.dx[-1][1], self.dx[-1][1]))
         self.x_edges.append(self.dx[-1]-DM(dx))
         
 
         zhat = np.copy(z)
         z=DM(z)+repmat(vertcat(0, self.x[-1][-1]), 1, z.shape[0]).T
-        # print(z.shape, len(vertsplit(z)))
         z=[self.cartesianCasadi(*horzsplit(i)) for i in vertsplit(z)] # symbolic
         
         zhat[:, 1] += np.ones(zhat.shape[0])*self.xhat[-1][-1]
@@ -254,10 +257,10 @@ if __name__ == '__main__':
         lambda shape: np.random.random(shape)*0.001,
         pose_divider=2,
         lm_divider=3,
-        # mode=Sim.POLAR
+        mode=Sim.POLAR
     )
-    # slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], -np.pi/2]))
-    slam = LinearGraphSLAM(x0=np.array([0.0,0.0]))
+    slam = PolarGraphSLAM(x0=np.array([path[0][0], path[0][1], 0]))
+    # slam = LinearGraphSLAM(x0=np.array([0.0,0.0]))
     count = 0
     start = np.array([0.0,0.0])
     angle = 0
@@ -266,7 +269,6 @@ if __name__ == '__main__':
     for dx, z in sim:
         angle += dx[1]
         #TODO: implement stupid test here for measurements. Isolate errors in this file or Sim
-        # Sim.rot(angle)@np.array([[dx[1]], [0]])
         states.append(list(start))
         start += (sim.rot(angle)@np.array([[dx[0]], [0]])).flatten()
         slam.update_graph(dx, z)
